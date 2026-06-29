@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LogicLens — детектор логических ошибок</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0D0D0F;
+  --surface:   #141418;
+  --card:      #1C1C23;
+  --border:    #2A2A35;
+  --accent:    #00E5A0;
+  --accent-dim:#00A872;
+  --text:      #F0EDE8;
+  --muted:     #6B6B7A;
+  --danger:    #FF5C5C;
+  --gold:      #F5C542;
+  --blue:      #5B9CF6;
+  --mono:      'JetBrains Mono', monospace;
+  --sans:      'Inter', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 16px 80px;
+}
+
+/* ── Header ── */
+header { text-align: center; margin-bottom: 36px; }
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.logo-icon {
+  width: 34px; height: 34px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: grid; place-items: center;
+}
+
+.logo-text {
+  font-family: var(--mono);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.logo-text span { color: var(--accent); }
+
+header p { font-size: 0.85rem; color: var(--muted); }
+
+/* ── Mode tabs ── */
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 9px 20px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+
+.mode-tab.active {
+  background: var(--card);
+  color: var(--accent);
+}
+
+/* ── Container ── */
+.container { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ── Panel visibility ── */
+.panel { display: none; }
+.panel.active { display: contents; }
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.card-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: block;
+}
+
+textarea {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 0.93rem;
+  line-height: 1.6;
+  padding: 13px 15px;
+  resize: vertical;
+  min-height: 100px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+textarea::placeholder { color: var(--muted); }
+textarea:focus { border-color: var(--accent-dim); }
+
+input[type="text"] {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input[type="text"]:focus { border-color: var(--accent-dim); }
+input::placeholder { color: var(--muted); }
+
+.input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  gap: 10px;
+}
+
+.char-count { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
+
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+  white-space: nowrap;
+}
+.btn:hover { opacity: 0.88; }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.32; cursor: not-allowed; }
+.btn-accent { background: var(--accent); color: #0D0D0F; }
+.btn-gold   { background: var(--gold);   color: #0D0D0F; }
+
+/* ── Scanning ── */
+.scanning {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+.scanning.visible { display: flex; }
+
+.scan-dot {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:.3; transform:scale(.7); }
+}
+
+/* ── Error ── */
+.error-card {
+  display: none;
+  background: var(--surface);
+  border: 1px solid #3D2020;
+  border-radius: 14px;
+  padding: 15px 20px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--danger);
+}
+.error-card.visible { display: block; }
+
+/* ── Analyze result ── */
+.result-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.result-card.visible { opacity: 1; transform: translateY(0); }
+
+.result-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.fallacy-name { font-family: var(--mono); font-size: 1rem; font-weight: 700; color: var(--accent); }
+.fallacy-ru   { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+
+.conf-badge {
+  flex-shrink: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 11px;
+  text-align: center;
+}
+.conf-val { font-family: var(--mono); font-size: 1.05rem; font-weight: 700; line-height: 1; }
+.conf-lbl { font-family: var(--mono); font-size: 0.6rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-top: 2px; }
+
+.bar-section { padding: 12px 20px; border-bottom: 1px solid var(--border); }
+.bar-label   { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 7px; }
+.bar-track   { height: 4px; background: var(--card); border-radius: 4px; overflow: hidden; }
+.bar-fill    { height: 100%; border-radius: 4px; width: 0%; transition: width .8s cubic-bezier(.22,1,.36,1); }
+.bar-fill.accent { background: linear-gradient(90deg, var(--accent-dim), var(--accent)); }
+.bar-fill.gold   { background: linear-gradient(90deg, #c9a000, var(--gold)); }
+
+.scores-section { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 7px; }
+.score-row  { display: flex; align-items: center; gap: 9px; }
+.score-lbl  { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); width: 195px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score-lbl.top { color: var(--accent); }
+.score-track { flex: 1; height: 3px; background: var(--card); border-radius: 3px; overflow: hidden; }
+.score-fill  { height: 100%; background: var(--border); border-radius: 3px; width: 0%; transition: width .7s cubic-bezier(.22,1,.36,1); }
+.score-fill.top { background: var(--accent); }
+.score-val  { font-family: var(--mono); font-size: 0.67rem; color: var(--muted); width: 36px; text-align: right; flex-shrink: 0; }
+
+.expl-section { padding: 16px 20px; }
+.eyebrow { font-family: var(--mono); font-size: 0.65rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 9px; }
+.expl-text { font-size: 0.9rem; line-height: 1.8; color: var(--text); white-space: pre-wrap; }
+
+/* ── Debate layout ── */
+.debate-players {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.player-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.player-label-a { font-family: var(--mono); font-size: 0.68rem; font-weight: 700; color: var(--accent); letter-spacing: .08em; text-transform: uppercase; }
+.player-label-b { font-family: var(--mono); font-size: 0.68rem; font-weight: 700; color: var(--blue);   letter-spacing: .08em; text-transform: uppercase; }
+
+.name-input-wrap { display: flex; flex-direction: column; gap: 6px; }
+.name-label { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+
+.debate-topic-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+
+.debate-footer {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+/* ── Debate result ── */
+.debate-result {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.35s, transform 0.35s;
+}
+.debate-result.visible { opacity: 1; transform: translateY(0); }
+
+.scoreboard {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.scorer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.scorer-name { font-family: var(--mono); font-size: 0.75rem; font-weight: 700; letter-spacing: .04em; }
+.scorer-name.a { color: var(--accent); }
+.scorer-name.b { color: var(--blue); }
+
+.scorer-score {
+  font-family: var(--mono);
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.scorer-score.a { color: var(--accent); }
+.scorer-score.b { color: var(--blue); }
+.scorer-score.winner { text-shadow: 0 0 20px currentColor; }
+
+.scorer-fallacy { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); text-align: center; max-width: 120px; }
+
+.vs-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.vs-text { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+
+.winner-badge {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.winner-badge.a    { background: rgba(0,229,160,.15); color: var(--accent); border: 1px solid rgba(0,229,160,.3); }
+.winner-badge.b    { background: rgba(91,156,246,.15); color: var(--blue);   border: 1px solid rgba(91,156,246,.3); }
+.winner-badge.draw { background: rgba(245,197,66,.12); color: var(--gold);   border: 1px solid rgba(245,197,66,.3); }
+
+.player-analysis {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.player-analysis-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pa-name { font-family: var(--mono); font-size: 0.82rem; font-weight: 700; }
+.pa-name.a { color: var(--accent); }
+.pa-name.b { color: var(--blue); }
+
+.pa-score-pill {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+.pa-score-pill.a { background: rgba(0,229,160,.12); color: var(--accent); }
+.pa-score-pill.b { background: rgba(91,156,246,.12); color: var(--blue); }
+
+.pa-body { padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+
+.pa-text-quote {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-style: italic;
+  line-height: 1.6;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+}
+
+.pa-feedback { font-size: 0.88rem; line-height: 1.75; color: var(--text); }
+
+.verdict-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.verdict-text { font-size: 0.9rem; line-height: 1.8; color: var(--text); }
+
+footer {
+  margin-top: 40px;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: .04em;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .debate-players { grid-template-columns: 1fr; }
+  .scoreboard { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; }
+  .vs-block { grid-column: 1 / -1; order: -1; flex-direction: row; }
+  .score-lbl { width: 130px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-dot { animation: none; }
+  .result-card, .debate-result, .bar-fill, .score-fill { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <circle cx="8" cy="8" r="5" stroke="#0D0D0F" stroke-width="2"/>
+        <line x1="12" y1="12" x2="17" y2="17" stroke="#0D0D0F" stroke-width="2.2" stroke-linecap="round"/>
+        <line x1="5" y1="8" x2="11" y2="8" stroke="#0D0D0F" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="8" y1="5" x2="8" y2="11" stroke="#0D0D0F" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <span class="logo-text">Logic<span>Lens</span></span>
+  </div>
+  <p>Детектор логических ошибок · xlm-roberta + qwen3-8b</p>
+</header>
+
+<div class="mode-tabs">
+  <button class="mode-tab active" onclick="switchMode('analyze')">АНАЛИЗ</button>
+  <button class="mode-tab"        onclick="switchMode('debate')">ДЕБАТЫ</button>
+</div>
+
+<div class="container" id="container">
+
+  <!-- ══ ANALYZE PANEL ══════════════════════════════════════════════ -->
+  <div class="panel active" id="panel-analyze">
+    <div class="card">
+      <label class="card-label" for="analyze-input">Введите аргумент или утверждение</label>
+      <textarea id="analyze-input" maxlength="2000"
+        placeholder="Например: Все известные учёные поддерживают эту теорию, значит она верна."></textarea>
+      <div class="input-footer">
+        <span class="char-count" id="analyze-chars">0 / 2000</span>
+        <button class="btn btn-accent" id="analyze-btn" disabled onclick="runAnalyze()">АНАЛИЗИРОВАТЬ</button>
+      </div>
+    </div>
+
+    <div class="scanning" id="analyze-scan"><div class="scan-dot"></div><span id="analyze-scan-text">Классификация...</span></div>
+    <div class="error-card" id="analyze-error"></div>
+
+    <div class="result-card" id="analyze-result">
+      <div class="result-header">
+        <div>
+          <div class="fallacy-name" id="ar-fallacy-name"></div>
+          <div class="fallacy-ru"   id="ar-fallacy-ru"></div>
+        </div>
+        <div class="conf-badge">
+          <div class="conf-val" id="ar-conf-val"></div>
+          <div class="conf-lbl">уверенность</div>
+        </div>
+      </div>
+      <div class="bar-section">
+        <div class="bar-label">Уверенность классификатора</div>
+        <div class="bar-track"><div class="bar-fill accent" id="ar-bar"></div></div>
+      </div>
+      <div class="scores-section" id="ar-scores"></div>
+      <div class="expl-section">
+        <div class="eyebrow">Объяснение</div>
+        <div class="expl-text" id="ar-expl"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ DEBATE PANEL ═══════════════════════════════════════════════ -->
+  <div class="panel" id="panel-debate">
+
+    <div class="debate-topic-card">
+      <label class="card-label" for="debate-topic">Тема дебатов (необязательно)</label>
+      <input type="text" id="debate-topic" maxlength="300" placeholder="Например: Следует ли ограничить использование смартфонов в школах?">
+    </div>
+
+    <div class="debate-players">
+      <div class="player-card">
+        <div class="player-label-a">Участник A</div>
+        <div class="name-input-wrap">
+          <span class="name-label">Имя</span>
+          <input type="text" id="name-a" value="Участник A" maxlength="50">
+        </div>
+        <div>
+          <span class="card-label" style="color:var(--accent)">Аргумент</span>
+          <textarea id="text-a" maxlength="2000"
+            placeholder="Введите аргумент первого участника..."></textarea>
+          <div class="input-footer">
+            <span class="char-count" id="chars-a">0 / 2000</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="player-card">
+        <div class="player-label-b">Участник B</div>
+        <div class="name-input-wrap">
+          <span class="name-label">Имя</span>
+          <input type="text" id="name-b" value="Участник B" maxlength="50">
+        </div>
+        <div>
+          <span class="card-label" style="color:var(--blue)">Аргумент</span>
+          <textarea id="text-b" maxlength="2000"
+            placeholder="Введите аргумент второго участника..."></textarea>
+          <div class="input-footer">
+            <span class="char-count" id="chars-b">0 / 2000</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="debate-footer">
+      <button class="btn btn-gold" id="debate-btn" disabled onclick="runDebate()">⚔ НАЧАТЬ ДЕБАТЫ</button>
+    </div>
+
+    <div class="scanning" id="debate-scan"><div class="scan-dot"></div><span id="debate-scan-text">Анализ аргументов...</span></div>
+    <div class="error-card" id="debate-error"></div>
+
+    <!-- Debate result -->
+    <div class="debate-result" id="debate-result">
+
+      <!-- Scoreboard -->
+      <div class="scoreboard">
+        <div class="scorer">
+          <div class="scorer-name a" id="sb-name-a">A</div>
+          <div class="scorer-score a" id="sb-score-a">—</div>
+          <div class="scorer-fallacy" id="sb-fallacy-a"></div>
+        </div>
+        <div class="vs-block">
+          <div class="vs-text">VS</div>
+          <div class="winner-badge" id="sb-winner-badge">—</div>
+        </div>
+        <div class="scorer">
+          <div class="scorer-name b" id="sb-name-b">B</div>
+          <div class="scorer-score b" id="sb-score-b">—</div>
+          <div class="scorer-fallacy" id="sb-fallacy-b"></div>
+        </div>
+      </div>
+
+      <!-- Player A analysis -->
+      <div class="player-analysis">
+        <div class="player-analysis-header">
+          <span class="pa-name a" id="pa-name-a">Участник A</span>
+          <span class="pa-score-pill a" id="pa-pill-a"></span>
+        </div>
+        <div class="pa-body">
+          <div class="pa-text-quote" id="pa-quote-a"></div>
+          <div class="bar-section" style="padding:0;">
+            <div class="bar-label" style="margin-bottom:6px;">Балл логичности</div>
+            <div class="bar-track"><div class="bar-fill accent" id="pa-bar-a"></div></div>
+          </div>
+          <div class="eyebrow" style="margin-top:4px;">Разбор</div>
+          <div class="pa-feedback" id="pa-feedback-a"></div>
+        </div>
+      </div>
+
+      <!-- Player B analysis -->
+      <div class="player-analysis">
+        <div class="player-analysis-header">
+          <span class="pa-name b" id="pa-name-b">Участник B</span>
+          <span class="pa-score-pill b" id="pa-pill-b"></span>
+        </div>
+        <div class="pa-body">
+          <div class="pa-text-quote" id="pa-quote-b"></div>
+          <div class="bar-section" style="padding:0;">
+            <div class="bar-label" style="margin-bottom:6px;">Балл логичности</div>
+            <div class="bar-track"><div class="bar-fill" style="background:linear-gradient(90deg,#3a6fd8,var(--blue))" id="pa-bar-b"></div></div>
+          </div>
+          <div class="eyebrow" style="margin-top:4px;">Разбор</div>
+          <div class="pa-feedback" id="pa-feedback-b"></div>
+        </div>
+      </div>
+
+      <!-- Verdict -->
+      <div class="verdict-card">
+        <div class="eyebrow">Вердикт судьи</div>
+        <div class="verdict-text" id="verdict-text"></div>
+      </div>
+
+    </div><!-- /debate-result -->
+  </div><!-- /panel-debate -->
+
+</div><!-- /container -->
+
+<footer>LogicLens · LOGIC dataset (Jin et al., EMNLP 2022) · 13 классов</footer>
+
+<script>
+const API = 'http://10.19.84.130:8000';
+
+/* ── Mode switch ────────────────────────────────────────────────── */
+function switchMode(mode) {
+  document.querySelectorAll('.mode-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0) === (mode === 'analyze'));
+  });
+  document.getElementById('panel-analyze').classList.toggle('active', mode === 'analyze');
+  document.getElementById('panel-debate').classList.toggle('active',  mode === 'debate');
+}
+
+/* ── Char counters ──────────────────────────────────────────────── */
+function setupCounter(textareaId, counterId, btnIds) {
+  const ta  = document.getElementById(textareaId);
+  const cnt = document.getElementById(counterId);
+  ta.addEventListener('input', () => {
+    cnt.textContent = `${ta.value.length} / 2000`;
+    checkDebateBtn();
+    btnIds.forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.disabled = ta.value.trim().length < 5;
+    });
+  });
+}
+setupCounter('analyze-input', 'analyze-chars', ['analyze-btn']);
+setupCounter('text-a', 'chars-a', []);
+setupCounter('text-b', 'chars-b', []);
+
+document.getElementById('analyze-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runAnalyze();
+});
+
+function checkDebateBtn() {
+  const a = document.getElementById('text-a').value.trim().length >= 5;
+  const b = document.getElementById('text-b').value.trim().length >= 5;
+  document.getElementById('debate-btn').disabled = !(a && b);
+}
+
+/* ── Scanning messages ──────────────────────────────────────────── */
+function startScan(scanId, textId, messages) {
+  const el = document.getElementById(scanId);
+  const tx = document.getElementById(textId);
+  el.classList.add('visible');
+  tx.textContent = messages[0];
+  let i = 0;
+  return setInterval(() => { tx.textContent = messages[++i % messages.length]; }, 2200);
+}
+function stopScan(scanId, interval) {
+  clearInterval(interval);
+  document.getElementById(scanId).classList.remove('visible');
+}
+
+/* ── Shared helpers ─────────────────────────────────────────────── */
+function pct(v) { return (v * 100).toFixed(1) + '%'; }
+function show(el, animate) {
+  if (animate) requestAnimationFrame(() => el.classList.add('visible'));
+  else el.classList.add('visible');
+}
+function hide(el) { el.classList.remove('visible'); }
+
+function renderScores(containerId, scores) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  scores.forEach((s, i) => {
+    const row = document.createElement('div'); row.className = 'score-row';
+    const lbl = document.createElement('span');
+    lbl.className = 'score-lbl' + (i === 0 ? ' top' : '');
+    lbl.textContent = s.label; lbl.title = s.label;
+    const track = document.createElement('div'); track.className = 'score-track';
+    const fill  = document.createElement('div');
+    fill.className = 'score-fill' + (i === 0 ? ' top' : '');
+    track.appendChild(fill);
+    const val = document.createElement('span');
+    val.className = 'score-val'; val.textContent = pct(s.score);
+    row.append(lbl, track, val);
+    el.appendChild(row);
+    requestAnimationFrame(() => setTimeout(() => { fill.style.width = pct(s.score); }, 80 + i * 60));
+  });
+}
+
+function animateBar(id, value) {
+  requestAnimationFrame(() => setTimeout(() => {
+    document.getElementById(id).style.width = pct(value);
+  }, 120));
+}
+
+/* ── ANALYZE ────────────────────────────────────────────────────── */
+async function runAnalyze() {
+  const text = document.getElementById('analyze-input').value.trim();
+  if (text.length < 5) return;
+
+  hide(document.getElementById('analyze-result'));
+  hide(document.getElementById('analyze-error'));
+  document.getElementById('analyze-btn').disabled = true;
+
+  const interval = startScan('analyze-scan', 'analyze-scan-text', [
+    'Классификация ошибки...', 'Генерация объяснения...', 'Финальная обработка...'
+  ]);
+
+  try {
+    const res  = await fetch(`${API}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, top_k: 3 }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
+    const data = await res.json();
+
+    document.getElementById('ar-fallacy-name').textContent = data.fallacy_type;
+    document.getElementById('ar-fallacy-ru').textContent   = data.fallacy_type_ru;
+    document.getElementById('ar-conf-val').textContent     = pct(data.confidence);
+    document.getElementById('ar-expl').textContent         = data.explanation;
+    renderScores('ar-scores', data.scores);
+
+    const rc = document.getElementById('analyze-result');
+    show(rc, true);
+    animateBar('ar-bar', data.confidence);
+    setTimeout(() => rc.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 200);
+  } catch (e) {
+    const ec = document.getElementById('analyze-error');
+    ec.textContent = `⚠ ${e.message}`;
+    ec.classList.add('visible');
+  } finally {
+    stopScan('analyze-scan', interval);
+    document.getElementById('analyze-btn').disabled =
+      document.getElementById('analyze-input').value.trim().length < 5;
+  }
+}
+
+/* ── DEBATE ─────────────────────────────────────────────────────── */
+async function runDebate() {
+  const textA = document.getElementById('text-a').value.trim();
+  const textB = document.getElementById('text-b').value.trim();
+  if (textA.length < 5 || textB.length < 5) return;
+
+  const dr = document.getElementById('debate-result');
+  hide(dr);
+  hide(document.getElementById('debate-error'));
+  document.getElementById('debate-btn').disabled = true;
+
+  const interval = startScan('debate-scan', 'debate-scan-text', [
+    'Анализ аргументов...', 'Оценка логики...', 'Генерация разборов...', 'Формирование вердикта...'
+  ]);
+
+  try {
+    const res = await fetch(`${API}/debate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic:  document.getElementById('debate-topic').value.trim(),
+        text_a: textA,
+        text_b: textB,
+        name_a: document.getElementById('name-a').value.trim() || 'Участник A',
+        name_b: document.getElementById('name-b').value.trim() || 'Участник B',
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
+    const d = await res.json();
+
+    renderDebate(d);
+    show(dr, true);
+    setTimeout(() => dr.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 200);
+  } catch (e) {
+    const ec = document.getElementById('debate-error');
+    ec.textContent = `⚠ ${e.message}`;
+    ec.classList.add('visible');
+  } finally {
+    stopScan('debate-scan', interval);
+    checkDebateBtn();
+  }
+}
+
+function renderDebate(d) {
+  const a = d.player_a, b = d.player_b;
+
+  // Scoreboard
+  document.getElementById('sb-name-a').textContent    = a.name;
+  document.getElementById('sb-name-b').textContent    = b.name;
+  document.getElementById('sb-score-a').textContent   = a.logic_score;
+  document.getElementById('sb-score-b').textContent   = b.logic_score;
+  document.getElementById('sb-fallacy-a').textContent = a.fallacy_type;
+  document.getElementById('sb-fallacy-b').textContent = b.fallacy_type;
+
+  // Winner highlight
+  const sa = document.getElementById('sb-score-a');
+  const sb = document.getElementById('sb-score-b');
+  sa.classList.toggle('winner', d.winner === 'A');
+  sb.classList.toggle('winner', d.winner === 'B');
+
+  const badge = document.getElementById('sb-winner-badge');
+  if (d.winner === 'A') {
+    badge.textContent = `🏆 ${a.name}`; badge.className = 'winner-badge a';
+  } else if (d.winner === 'B') {
+    badge.textContent = `🏆 ${b.name}`; badge.className = 'winner-badge b';
+  } else {
+    badge.textContent = '🤝 Ничья'; badge.className = 'winner-badge draw';
+  }
+
+  // Player A
+  document.getElementById('pa-name-a').textContent     = a.name;
+  document.getElementById('pa-pill-a').textContent     = `${a.logic_score} / 100`;
+  document.getElementById('pa-quote-a').textContent    = `«${a.text}»`;
+  document.getElementById('pa-feedback-a').textContent = a.feedback;
+  animateBar('pa-bar-a', a.logic_score / 100);
+
+  // Player B
+  document.getElementById('pa-name-b').textContent     = b.name;
+  document.getElementById('pa-pill-b').textContent     = `${b.logic_score} / 100`;
+  document.getElementById('pa-quote-b').textContent    = `«${b.text}»`;
+  document.getElementById('pa-feedback-b').textContent = b.feedback;
+  animateBar('pa-bar-b', b.logic_score / 100);
+
+  // Verdict
+  document.getElementById('verdict-text').textContent = d.verdict;
+}
+</script>
+</body>
+</html>

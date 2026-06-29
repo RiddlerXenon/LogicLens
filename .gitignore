@@ -1,0 +1,14 @@
+checkpoints/
+checkpoints-xlmr/
+checkpoints-xlmr-v2/
+checkpoints-xlmr-v3/
+checkpoints-deberta/
+checkpoints-ru/
+classifier/
+classifier-ru/
+classifier-xlmr/
+classifier-deberta/
+translated/
+translated_safe/
+__pycache__/
+*.log
